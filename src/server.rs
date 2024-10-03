@@ -124,7 +124,6 @@ impl ApplicationHandler<UserEvent> for VelloApp {
             UserEvent::CloseWindow => {
                 event_loop.exit();
             }
-            UserEvent::WakeUp => {}
         };
     }
 }
@@ -132,7 +131,6 @@ impl ApplicationHandler<UserEvent> for VelloApp {
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 enum UserEvent {
-    WakeUp,
     ResizeWindow { height: i32, width: i32 },
     CloseWindow,
 }
