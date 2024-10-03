@@ -18,7 +18,7 @@ use winit::{
 use tonic::{transport::Server, Request, Response, Status};
 
 use graphics_device::graphics_device_server::{GraphicsDevice, GraphicsDeviceServer};
-use graphics_device::{Empty, ResizeWindowRequest};
+use graphics_device::{Empty, ResizeWindowRequest, SetBackgroundRequest};
 
 pub mod graphics_device {
     tonic::include_proto!("graphics_device");
@@ -41,7 +41,7 @@ impl GraphicsDevice for MyGraphicsDevice {
         &self,
         request: Request<ResizeWindowRequest>,
     ) -> Result<Response<Empty>, Status> {
-        println!("Got a request: {:?}", request);
+        println!("{:?}", request);
 
         let ResizeWindowRequest { width, height } = request.get_ref();
         self.event_loop_proxy
@@ -57,7 +57,7 @@ impl GraphicsDevice for MyGraphicsDevice {
     }
 
     async fn close_window(&self, request: Request<Empty>) -> Result<Response<Empty>, Status> {
-        println!("Got a request: {:?}", request);
+        println!("{:?}", request);
 
         self.event_loop_proxy
             .send_event(UserEvent::CloseWindow)
@@ -65,6 +65,29 @@ impl GraphicsDevice for MyGraphicsDevice {
 
         let reply = Empty {};
 
+        Ok(Response::new(reply))
+    }
+
+    async fn set_background(
+        &self,
+        request: Request<SetBackgroundRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        println!("{:?}", request);
+
+        let SetBackgroundRequest { color } = request.get_ref();
+
+        let color = match color {
+            1 => Color::WHITE,
+            2 => Color::RED,
+            3 => Color::BLUE,
+            4 => Color::GREEN,
+            _ => Color::BLACK,
+        };
+        self.event_loop_proxy
+            .send_event(UserEvent::SetBackground { color })
+            .map_err(|e| Status::from_error(Box::new(e)))?;
+
+        let reply = Empty {};
         Ok(Response::new(reply))
     }
 }
@@ -85,6 +108,8 @@ struct VelloApp<'a> {
     renderers: Vec<Option<Renderer>>,
     state: RenderState<'a>,
     scene: Scene,
+
+    background_color: Color, // TODO
 }
 
 impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
@@ -172,7 +197,7 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                             &self.scene,
                             &surface_texture,
                             &vello::RenderParams {
-                                base_color: Color::GREEN,
+                                base_color: self.background_color,
                                 width,
                                 height,
                                 antialiasing_method: AaConfig::Msaa16,
@@ -209,6 +234,10 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
             UserEvent::CloseWindow => {
                 event_loop.exit();
             }
+            UserEvent::SetBackground { color } => {
+                self.background_color = color;
+                render_state.window.request_redraw();
+            }
         };
     }
 }
@@ -218,6 +247,7 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
 enum UserEvent {
     ResizeWindow { height: i32, width: i32 },
     CloseWindow,
+    SetBackground { color: Color },
 }
 
 fn create_vello_renderer(render_cx: &RenderContext, surface: &RenderSurface) -> Renderer {
@@ -240,6 +270,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         renderers: vec![],
         state: RenderState::Suspended(None),
         scene: Scene::new(),
+        background_color: Color::TRANSPARENT,
     };
     let event_loop = EventLoop::<UserEvent>::with_user_event().build()?;
     let event_loop_proxy = event_loop.create_proxy();

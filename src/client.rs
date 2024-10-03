@@ -1,5 +1,5 @@
 use graphics_device::graphics_device_client::GraphicsDeviceClient;
-use graphics_device::{Empty, ResizeWindowRequest};
+use graphics_device::{Empty, ResizeWindowRequest, SetBackgroundRequest};
 
 pub mod graphics_device {
     tonic::include_proto!("graphics_device");
@@ -9,12 +9,19 @@ pub mod graphics_device {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = GraphicsDeviceClient::connect("http://[::1]:50051").await?;
 
-    let args = std::env::args().nth(1).unwrap_or_default();
-    println!("{args}");
-    let response = match args.as_str() {
+    let subcommand = std::env::args().nth(1).unwrap_or_default();
+    println!("{subcommand}");
+    let response = match subcommand.as_str() {
         "close" => {
             let request = tonic::Request::new(Empty {});
             client.close_window(request).await
+        }
+        "bg" => {
+            let color = std::env::args().nth(2).unwrap_or_default();
+            let request = tonic::Request::new(SetBackgroundRequest {
+                color: color.parse().unwrap_or(1),
+            });
+            client.set_background(request).await
         }
         _ => {
             let request = tonic::Request::new(ResizeWindowRequest {

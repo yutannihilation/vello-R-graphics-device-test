@@ -4,6 +4,7 @@ package graphics_device;
 service GraphicsDevice {
     rpc ResizeWindow (ResizeWindowRequest) returns (Empty);
     rpc CloseWindow (Empty) returns (Empty);
+    rpc SetBackground (SetBackgroundRequest) returns (Empty);
 }
 
 message Empty {}
@@ -11,4 +12,8 @@ message Empty {}
 message ResizeWindowRequest {
     int32 height = 1;
     int32 width = 2;
+}
+
+message SetBackgroundRequest {
+    int32 color = 1;
 }
