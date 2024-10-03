@@ -3,7 +3,7 @@ use std::{error::Error, sync::mpsc, time::Duration};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
-    event_loop::EventLoop,
+    event_loop::{EventLoop, EventLoopProxy},
     platform::pump_events::EventLoopExtPumpEvents,
     window::{Window, WindowId},
 };
@@ -19,12 +19,12 @@ pub mod draw {
 
 #[derive(Debug)]
 struct MyGreeter {
-    // event_loop: EventLoop<usize>,
+    event_loop_proxy: EventLoopProxy<UserEvent>,
 }
 
 impl MyGreeter {
-    fn new() -> Self {
-        Self {}
+    fn new(event_loop_proxy: EventLoopProxy<UserEvent>) -> Self {
+        Self { event_loop_proxy }
     }
 }
 
@@ -35,6 +35,10 @@ impl Greeter for MyGreeter {
         request: Request<HelloRequest>,
     ) -> Result<Response<HelloReply>, Status> {
         println!("Got a request: {:?}", request);
+
+        self.event_loop_proxy
+            .send_event(UserEvent::Hello)
+            .map_err(|e| Status::from_error(Box::new(e)))?;
 
         let reply = HelloReply {
             message: format!("Hello {}!", request.into_inner().name),
@@ -91,12 +95,29 @@ impl ApplicationHandler<UserEvent> for VelloApp {
             _ => (),
         }
     }
+
+    fn user_event(&mut self, event_loop: &winit::event_loop::ActiveEventLoop, event: UserEvent) {
+        match event {
+            UserEvent::Hello => {
+                if let Some(window) = self.window.as_mut() {
+                    let sizes = window.inner_size();
+                    // TODO: handle error
+                    let _res = window.request_inner_size(winit::dpi::LogicalSize::new(
+                        sizes.width + 100,
+                        sizes.height + 100,
+                    ));
+                }
+            }
+            UserEvent::WakeUp => {}
+        };
+    }
 }
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 enum UserEvent {
     WakeUp,
+    Hello,
 }
 
 // fn main() -> Result<(), Box<dyn Error>> {
@@ -123,18 +144,19 @@ enum UserEvent {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "[::1]:50051".parse()?;
-    let greeter = MyGreeter::new();
-
     let mut app = VelloApp {
         idx: 1,
         ..Default::default()
     };
     let event_loop = EventLoop::<UserEvent>::with_user_event().build()?;
-    let proxy = event_loop.create_proxy();
+    let event_loop_proxy = event_loop.create_proxy();
+
+    let addr = "[::1]:50051".parse()?;
+    let greeter = MyGreeter::new(event_loop_proxy);
 
     tokio::spawn(async move {
-        Server::builder()
+        // TODO: propagate error via EventLoopProxy
+        let _res = Server::builder()
             .add_service(GreeterServer::new(greeter))
             .serve(addr)
             .await;
