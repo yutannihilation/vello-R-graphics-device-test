@@ -4,45 +4,46 @@ use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
     event_loop::{EventLoop, EventLoopProxy},
-    platform::pump_events::EventLoopExtPumpEvents,
     window::{Window, WindowId},
 };
 
 use tonic::{transport::Server, Request, Response, Status};
 
-use draw::greeter_server::{Greeter, GreeterServer};
-use draw::{HelloReply, HelloRequest};
+use graphics_device::graphics_device_server::{GraphicsDevice, GraphicsDeviceServer};
+use graphics_device::{Empty, ResizeWindowRequest};
 
-pub mod draw {
-    tonic::include_proto!("draw");
+pub mod graphics_device {
+    tonic::include_proto!("graphics_device");
 }
 
 #[derive(Debug)]
-struct MyGreeter {
+struct MyGraphicsDevice {
     event_loop_proxy: EventLoopProxy<UserEvent>,
 }
 
-impl MyGreeter {
+impl MyGraphicsDevice {
     fn new(event_loop_proxy: EventLoopProxy<UserEvent>) -> Self {
         Self { event_loop_proxy }
     }
 }
 
 #[tonic::async_trait]
-impl Greeter for MyGreeter {
-    async fn say_hello(
+impl GraphicsDevice for MyGraphicsDevice {
+    async fn resize_window(
         &self,
-        request: Request<HelloRequest>,
-    ) -> Result<Response<HelloReply>, Status> {
+        request: Request<ResizeWindowRequest>,
+    ) -> Result<Response<Empty>, Status> {
         println!("Got a request: {:?}", request);
 
+        let ResizeWindowRequest { width, height } = request.get_ref();
         self.event_loop_proxy
-            .send_event(UserEvent::Hello)
+            .send_event(UserEvent::ResizeWindow {
+                height: *height,
+                width: *width,
+            })
             .map_err(|e| Status::from_error(Box::new(e)))?;
 
-        let reply = HelloReply {
-            message: format!("Hello {}!", request.into_inner().name),
-        };
+        let reply = Empty {};
 
         Ok(Response::new(reply))
     }
@@ -98,13 +99,13 @@ impl ApplicationHandler<UserEvent> for VelloApp {
 
     fn user_event(&mut self, event_loop: &winit::event_loop::ActiveEventLoop, event: UserEvent) {
         match event {
-            UserEvent::Hello => {
+            UserEvent::ResizeWindow { height, width } => {
                 if let Some(window) = self.window.as_mut() {
                     let sizes = window.inner_size();
                     // TODO: handle error
                     let _res = window.request_inner_size(winit::dpi::LogicalSize::new(
-                        sizes.width + 100,
-                        sizes.height + 100,
+                        (sizes.width as i32 + height) as u32,
+                        (sizes.height as i32 + width) as u32,
                     ));
                 }
             }
@@ -117,30 +118,8 @@ impl ApplicationHandler<UserEvent> for VelloApp {
 #[derive(Debug, Clone, Copy)]
 enum UserEvent {
     WakeUp,
-    Hello,
+    ResizeWindow { height: i32, width: i32 },
 }
-
-// fn main() -> Result<(), Box<dyn Error>> {
-//     let mut event_loop = EventLoop::<UserEvent>::with_user_event().build()?;
-//     // let (sender, receiver) = mpsc::channel();
-
-//     let event_loop_proxy = event_loop.create_proxy();
-//     // let sender_for_proxy = sender.clone();
-//     std::thread::spawn(move || {
-//         // let _ = sender.send(Action::Message);
-//         let _ = event_loop_proxy.send_event(UserEvent::WakeUp);
-//         std::thread::sleep(std::time::Duration::from_secs(1));
-//     });
-
-//     let mut app = VelloApp {
-//         idx: 1,
-//         ..Default::default()
-//     };
-//     event_loop.run_app_on_demand(&mut app)?;
-//     event_loop.run_app_on_demand(&mut app)?;
-
-//     Ok(())
-// }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -152,12 +131,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let event_loop_proxy = event_loop.create_proxy();
 
     let addr = "[::1]:50051".parse()?;
-    let greeter = MyGreeter::new(event_loop_proxy);
+    let greeter = MyGraphicsDevice::new(event_loop_proxy);
 
     tokio::spawn(async move {
         // TODO: propagate error via EventLoopProxy
         let _res = Server::builder()
-            .add_service(GreeterServer::new(greeter))
+            .add_service(GraphicsDeviceServer::new(greeter))
             .serve(addr)
             .await;
     });
