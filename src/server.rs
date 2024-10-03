@@ -47,6 +47,18 @@ impl GraphicsDevice for MyGraphicsDevice {
 
         Ok(Response::new(reply))
     }
+
+    async fn close_window(&self, request: Request<Empty>) -> Result<Response<Empty>, Status> {
+        println!("Got a request: {:?}", request);
+
+        self.event_loop_proxy
+            .send_event(UserEvent::CloseWindow)
+            .map_err(|e| Status::from_error(Box::new(e)))?;
+
+        let reply = Empty {};
+
+        Ok(Response::new(reply))
+    }
 }
 
 #[derive(Default)]
@@ -109,6 +121,9 @@ impl ApplicationHandler<UserEvent> for VelloApp {
                     ));
                 }
             }
+            UserEvent::CloseWindow => {
+                event_loop.exit();
+            }
             UserEvent::WakeUp => {}
         };
     }
@@ -119,6 +134,7 @@ impl ApplicationHandler<UserEvent> for VelloApp {
 enum UserEvent {
     WakeUp,
     ResizeWindow { height: i32, width: i32 },
+    CloseWindow,
 }
 
 #[tokio::main]
