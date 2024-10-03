@@ -3,9 +3,13 @@ name = "winit-proxy-test"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]] # Bin to run the HelloWorld gRPC server
+[[bin]]
 name = "server"
 path = "src/server.rs"
+
+[[bin]]
+name = "client"
+path = "src/client.rs"
 
 [dependencies]
 winit = "*"
@@ -16,7 +20,7 @@ anyhow = "1.0"
 
 tonic = "0.12"
 prost = "0.13"
-tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [build-dependencies]
 tonic-build = "0.12"

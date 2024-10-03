@@ -17,8 +17,16 @@ pub mod draw {
     tonic::include_proto!("draw");
 }
 
-#[derive(Debug, Default)]
-struct MyGreeter {}
+#[derive(Debug)]
+struct MyGreeter {
+    // event_loop: EventLoop<usize>,
+}
+
+impl MyGreeter {
+    fn new() -> Self {
+        Self {}
+    }
+}
 
 #[tonic::async_trait]
 impl Greeter for MyGreeter {
@@ -116,19 +124,23 @@ enum UserEvent {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "[::1]:50051".parse()?;
-    let greeter = MyGreeter::default();
+    let greeter = MyGreeter::new();
 
     let mut app = VelloApp {
         idx: 1,
         ..Default::default()
     };
-    let mut event_loop = EventLoop::<UserEvent>::with_user_event().build()?;
-    event_loop.pump_app_events(Some(Duration::ZERO), &mut app);
+    let event_loop = EventLoop::<UserEvent>::with_user_event().build()?;
+    let proxy = event_loop.create_proxy();
 
-    Server::builder()
-        .add_service(GreeterServer::new(greeter))
-        .serve(addr)
-        .await?;
+    tokio::spawn(async move {
+        Server::builder()
+            .add_service(GreeterServer::new(greeter))
+            .serve(addr)
+            .await;
+    });
+
+    event_loop.run_app(&mut app)?;
 
     Ok(())
 }
