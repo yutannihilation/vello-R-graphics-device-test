@@ -1,10 +1,18 @@
-use std::{error::Error, sync::mpsc, time::Duration};
+// The code related to vello is based on the example code on vello's repo
+// (examples/simple/main.rs).
 
+use std::{num::NonZeroUsize, sync::Arc};
+
+use vello::{
+    peniko::Color,
+    util::{RenderContext, RenderSurface},
+    AaConfig, DebugLayers, Renderer, RendererOptions, Scene,
+};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
     event_loop::{EventLoop, EventLoopProxy},
-    window::{Window, WindowId},
+    window::Window,
 };
 
 use tonic::{transport::Server, Request, Response, Status};
@@ -61,21 +69,63 @@ impl GraphicsDevice for MyGraphicsDevice {
     }
 }
 
-#[derive(Default)]
-struct VelloApp {
-    idx: usize,
-    window_id: Option<WindowId>,
-    window: Option<Window>,
+pub struct ActiveRenderState<'a> {
+    // The fields MUST be in this order, so that the surface is dropped before the window
+    surface: RenderSurface<'a>,
+    window: Arc<Window>,
 }
 
-impl ApplicationHandler<UserEvent> for VelloApp {
+enum RenderState<'a> {
+    Active(ActiveRenderState<'a>),
+    Suspended(Option<Arc<Window>>),
+}
+
+struct VelloApp<'a> {
+    context: RenderContext,
+    renderers: Vec<Option<Renderer>>,
+    state: RenderState<'a>,
+    scene: Scene,
+}
+
+impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let attr = Window::default_attributes()
-            .with_title("test")
-            .with_inner_size(winit::dpi::LogicalSize::new(400.0, 400.0));
-        let window = event_loop.create_window(attr).unwrap();
-        self.window_id = Some(window.id());
-        self.window = Some(window);
+        let RenderState::Suspended(cached_window) = &mut self.state else {
+            return;
+        };
+        let window = cached_window.take().unwrap_or_else(|| {
+            let attr = Window::default_attributes()
+                .with_title("test")
+                .with_inner_size(winit::dpi::LogicalSize::new(400.0, 400.0));
+            Arc::new(
+                event_loop
+                    .create_window(attr)
+                    .expect("failed to create window"),
+            )
+        });
+
+        let size = window.inner_size();
+        let surface = pollster::block_on(self.context.create_surface(
+            window.clone(),
+            size.width,
+            size.height,
+            vello::wgpu::PresentMode::AutoVsync,
+        ))
+        .expect("failed to create surface");
+
+        // Create a vello Renderer for the surface (using its device id)
+        self.renderers
+            .resize_with(self.context.devices.len(), || None);
+        self.renderers[surface.dev_id]
+            .get_or_insert_with(|| create_vello_renderer(&self.context, &surface));
+
+        // Save the Window and Surface to a state variable
+        self.state = RenderState::Active(ActiveRenderState { window, surface });
+    }
+
+    fn suspended(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
+        if let RenderState::Active(state) = &self.state {
+            self.state = RenderState::Suspended(Some(state.window.clone()));
+        }
     }
 
     fn window_event(
@@ -84,42 +134,77 @@ impl ApplicationHandler<UserEvent> for VelloApp {
         window_id: winit::window::WindowId,
         event: winit::event::WindowEvent,
     ) {
-        if event == WindowEvent::Destroyed && self.window_id == Some(window_id) {
-            self.window_id = None;
-            event_loop.exit();
-            return;
-        }
-
-        let window = match self.window.as_mut() {
-            Some(window) => window,
-            None => return,
+        let render_state = match &mut self.state {
+            RenderState::Active(state) if state.window.id() == window_id => state,
+            _ => return,
         };
 
         match event {
             WindowEvent::CloseRequested => {
-                // TODO
-                // fill::cleanup_window(window);
-                self.window = None;
+                // TODO: can this always be executed immediately?
+                event_loop.exit();
             }
+
+            WindowEvent::Resized(size) => {
+                self.context
+                    .resize_surface(&mut render_state.surface, size.width, size.height);
+            }
+
             WindowEvent::RedrawRequested => {
-                // TODO
-                // fill::fill_window(window);
+                self.scene.reset();
+
+                let surface = &render_state.surface;
+                let width = surface.config.width;
+                let height = surface.config.height;
+
+                let device_handle = &self.context.devices[surface.dev_id];
+
+                let surface_texture = surface
+                    .surface
+                    .get_current_texture()
+                    .expect("failed to get surface texture");
+
+                if let Some(renderer) = self.renderers[surface.dev_id].as_mut() {
+                    renderer
+                        .render_to_surface(
+                            &device_handle.device,
+                            &device_handle.queue,
+                            &self.scene,
+                            &surface_texture,
+                            &vello::RenderParams {
+                                base_color: Color::GREEN,
+                                width,
+                                height,
+                                antialiasing_method: AaConfig::Msaa16,
+                                debug: DebugLayers::none(),
+                            },
+                        )
+                        .expect("failed to render");
+                }
+
+                surface_texture.present();
+                device_handle.device.poll(vello::wgpu::Maintain::Poll);
             }
             _ => (),
         }
     }
 
     fn user_event(&mut self, event_loop: &winit::event_loop::ActiveEventLoop, event: UserEvent) {
+        let render_state = match &mut self.state {
+            RenderState::Active(state) => state,
+            _ => return,
+        };
+
         match event {
             UserEvent::ResizeWindow { height, width } => {
-                if let Some(window) = self.window.as_mut() {
-                    let sizes = window.inner_size();
-                    // TODO: handle error
-                    let _res = window.request_inner_size(winit::dpi::LogicalSize::new(
+                let sizes = render_state.window.inner_size();
+                // TODO: handle error
+                let _res = render_state
+                    .window
+                    .request_inner_size(winit::dpi::LogicalSize::new(
                         (sizes.width as i32 + height) as u32,
                         (sizes.height as i32 + width) as u32,
                     ));
-                }
             }
             UserEvent::CloseWindow => {
                 event_loop.exit();
@@ -135,11 +220,26 @@ enum UserEvent {
     CloseWindow,
 }
 
+fn create_vello_renderer(render_cx: &RenderContext, surface: &RenderSurface) -> Renderer {
+    Renderer::new(
+        &render_cx.devices[surface.dev_id].device,
+        RendererOptions {
+            surface_format: Some(surface.format),
+            use_cpu: false,
+            antialiasing_support: vello::AaSupport::all(),
+            num_init_threads: NonZeroUsize::new(1),
+        },
+    )
+    .expect("Couldn't create renderer")
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = VelloApp {
-        idx: 1,
-        ..Default::default()
+        context: RenderContext::new(),
+        renderers: vec![],
+        state: RenderState::Suspended(None),
+        scene: Scene::new(),
     };
     let event_loop = EventLoop::<UserEvent>::with_user_event().build()?;
     let event_loop_proxy = event_loop.create_proxy();
