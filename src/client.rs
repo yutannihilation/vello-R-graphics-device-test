@@ -37,14 +37,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let vello::peniko::Color { r, g, b, a } = vello::peniko::Color::PURPLE;
             let fill_color = u32::from_ne_bytes([r, g, b, a]);
-            let line_color = u32::from_ne_bytes([r, 0, 0, a]);
+            let stroke_color = u32::from_ne_bytes([r, 0, 0, a]);
+            let stroke_width = 10.0;
 
             let request = tonic::Request::new(DrawCircleRequest {
                 cx,
                 cy,
                 radius: 100.0,
                 fill_color,
-                line_color,
+                stroke_color,
+                stroke_width,
             });
             client.draw_circle(request).await
         }

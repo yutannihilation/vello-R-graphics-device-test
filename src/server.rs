@@ -104,7 +104,8 @@ impl GraphicsDevice for MyGraphicsDevice {
             cy,
             radius,
             fill_color,
-            line_color,
+            stroke_color,
+            stroke_width,
         } = request.get_ref();
 
         self.event_loop_proxy
@@ -112,7 +113,8 @@ impl GraphicsDevice for MyGraphicsDevice {
                 center: vello::kurbo::Point::new(*cx, *cy),
                 radius: *radius,
                 fill_color: *fill_color,
-                line_color: *line_color,
+                stroke_color: *stroke_color,
+                stroke_width: *stroke_width,
             })
             .map_err(|e| Status::from_error(Box::new(e)))?;
 
@@ -271,7 +273,8 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                 center,
                 radius,
                 fill_color,
-                line_color,
+                stroke_color,
+                stroke_width,
             } => {
                 let circle = vello::kurbo::Circle::new(center, radius);
 
@@ -286,10 +289,10 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                     );
                 }
 
-                if line_color != 0 {
-                    let [r, g, b, a] = line_color.to_ne_bytes();
+                if stroke_color != 0 && stroke_width > 0.0 {
+                    let [r, g, b, a] = stroke_color.to_ne_bytes();
                     self.scene.stroke(
-                        &vello::kurbo::Stroke::new(10.0),
+                        &vello::kurbo::Stroke::new(stroke_width),
                         vello::kurbo::Affine::IDENTITY,
                         vello::peniko::Color::rgba8(r, g, b, a),
                         None,
@@ -318,7 +321,8 @@ enum UserEvent {
         center: vello::kurbo::Point,
         radius: f64,
         fill_color: u32,
-        line_color: u32,
+        stroke_color: u32,
+        stroke_width: f64,
     },
 }
 
