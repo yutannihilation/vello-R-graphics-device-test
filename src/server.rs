@@ -99,12 +99,18 @@ impl GraphicsDevice for MyGraphicsDevice {
     ) -> Result<Response<Empty>, Status> {
         println!("{:?}", request);
 
-        let DrawCircleRequest { cx, cy, radius } = request.get_ref();
+        let DrawCircleRequest {
+            cx,
+            cy,
+            radius,
+            color,
+        } = request.get_ref();
 
         self.event_loop_proxy
             .send_event(UserEvent::DrawCircle {
                 center: vello::kurbo::Point::new(*cx, *cy),
                 radius: *radius,
+                color: *color,
             })
             .map_err(|e| Status::from_error(Box::new(e)))?;
 
@@ -141,7 +147,7 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
         let window = cached_window.take().unwrap_or_else(|| {
             let attr = Window::default_attributes()
                 .with_title("test")
-                .with_inner_size(winit::dpi::LogicalSize::new(400.0, 400.0));
+                .with_inner_size(winit::dpi::LogicalSize::new(600.0, 600.0));
             Arc::new(
                 event_loop
                     .create_window(attr)
@@ -259,16 +265,23 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                 self.background_color = color;
                 render_state.window.request_redraw();
             }
-            UserEvent::DrawCircle { center, radius } => {
+            UserEvent::DrawCircle {
+                center,
+                radius,
+                color,
+            } => {
                 let circle = vello::kurbo::Circle::new(center, radius);
-                let circle_fill_color = Color::rgb(0.9529, 0.5451, 0.6588);
+                let [r, g, b, a] = color.to_ne_bytes();
                 self.scene.fill(
                     vello::peniko::Fill::NonZero,
                     vello::kurbo::Affine::IDENTITY,
-                    circle_fill_color,
+                    vello::peniko::Color::rgba8(r, g, b, a),
                     None,
                     &circle,
                 );
+
+                // TODO: set a flag and redraw lazily
+                render_state.window.request_redraw();
             }
         };
     }
@@ -287,6 +300,7 @@ enum UserEvent {
     DrawCircle {
         center: vello::kurbo::Point,
         radius: f64,
+        color: u32,
     },
 }
 
@@ -310,7 +324,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         renderers: vec![],
         state: RenderState::Suspended(None),
         scene: Scene::new(),
-        background_color: Color::TRANSPARENT,
+        background_color: Color::WHITE_SMOKE,
     };
     let event_loop = EventLoop::<UserEvent>::with_user_event().build()?;
     let event_loop_proxy = event_loop.create_proxy();

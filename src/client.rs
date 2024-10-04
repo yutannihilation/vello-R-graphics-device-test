@@ -24,10 +24,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             client.set_background(request).await
         }
         "circle" => {
+            let cx: u32 = std::env::args()
+                .nth(2)
+                .unwrap_or_default()
+                .parse()
+                .unwrap_or(100);
+            let cy: u32 = std::env::args()
+                .nth(3)
+                .unwrap_or_default()
+                .parse()
+                .unwrap_or(100);
+
+            let a = (cx + cy) << 1;
+            let r = (cx + cy) << 2;
+            let g = (cx + cy) << 3;
+            let b = (cx + cy) << 4;
+            let color = (r << 24) | (g << 16) | (b << 8) | a as u32;
+
             let request = tonic::Request::new(DrawCircleRequest {
-                cx: 0.0,
-                cy: 0.0,
+                cx: cx as _,
+                cy: cy as _,
                 radius: 100.0,
+                color,
             });
             client.draw_circle(request).await
         }
