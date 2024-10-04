@@ -17,7 +17,10 @@ use winit::{
 
 use tonic::{transport::Server, Request, Response, Status};
 
-use graphics_device::graphics_device_server::{GraphicsDevice, GraphicsDeviceServer};
+use graphics_device::{
+    graphics_device_server::{GraphicsDevice, GraphicsDeviceServer},
+    DrawCircleRequest,
+};
 use graphics_device::{Empty, ResizeWindowRequest, SetBackgroundRequest};
 
 pub mod graphics_device {
@@ -85,6 +88,24 @@ impl GraphicsDevice for MyGraphicsDevice {
         };
         self.event_loop_proxy
             .send_event(UserEvent::SetBackground { color })
+            .map_err(|e| Status::from_error(Box::new(e)))?;
+
+        let reply = Empty {};
+        Ok(Response::new(reply))
+    }
+    async fn draw_circle(
+        &self,
+        request: Request<DrawCircleRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        println!("{:?}", request);
+
+        let DrawCircleRequest { cx, cy, radius } = request.get_ref();
+
+        self.event_loop_proxy
+            .send_event(UserEvent::DrawCircle {
+                center: vello::kurbo::Point::new(*cx, *cy),
+                radius: *radius,
+            })
             .map_err(|e| Status::from_error(Box::new(e)))?;
 
         let reply = Empty {};
@@ -176,7 +197,7 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
             }
 
             WindowEvent::RedrawRequested => {
-                self.scene.reset();
+                // self.scene.reset();
 
                 let surface = &render_state.surface;
                 let width = surface.config.width;
@@ -238,16 +259,35 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                 self.background_color = color;
                 render_state.window.request_redraw();
             }
+            UserEvent::DrawCircle { center, radius } => {
+                let circle = vello::kurbo::Circle::new(center, radius);
+                let circle_fill_color = Color::rgb(0.9529, 0.5451, 0.6588);
+                self.scene.fill(
+                    vello::peniko::Fill::NonZero,
+                    vello::kurbo::Affine::IDENTITY,
+                    circle_fill_color,
+                    None,
+                    &circle,
+                );
+            }
         };
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 enum UserEvent {
-    ResizeWindow { height: i32, width: i32 },
+    ResizeWindow {
+        height: i32,
+        width: i32,
+    },
     CloseWindow,
-    SetBackground { color: Color },
+    SetBackground {
+        color: Color,
+    },
+    DrawCircle {
+        center: vello::kurbo::Point,
+        radius: f64,
+    },
 }
 
 fn create_vello_renderer(render_cx: &RenderContext, surface: &RenderSurface) -> Renderer {

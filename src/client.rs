@@ -1,5 +1,5 @@
 use graphics_device::graphics_device_client::GraphicsDeviceClient;
-use graphics_device::{Empty, ResizeWindowRequest, SetBackgroundRequest};
+use graphics_device::{DrawCircleRequest, Empty, ResizeWindowRequest, SetBackgroundRequest};
 
 pub mod graphics_device {
     tonic::include_proto!("graphics_device");
@@ -22,6 +22,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 color: color.parse().unwrap_or(1),
             });
             client.set_background(request).await
+        }
+        "circle" => {
+            let request = tonic::Request::new(DrawCircleRequest {
+                cx: 0.0,
+                cy: 0.0,
+                radius: 100.0,
+            });
+            client.draw_circle(request).await
         }
         _ => {
             let request = tonic::Request::new(ResizeWindowRequest {
