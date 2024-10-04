@@ -103,14 +103,16 @@ impl GraphicsDevice for MyGraphicsDevice {
             cx,
             cy,
             radius,
-            color,
+            fill_color,
+            line_color,
         } = request.get_ref();
 
         self.event_loop_proxy
             .send_event(UserEvent::DrawCircle {
                 center: vello::kurbo::Point::new(*cx, *cy),
                 radius: *radius,
-                color: *color,
+                fill_color: *fill_color,
+                line_color: *line_color,
             })
             .map_err(|e| Status::from_error(Box::new(e)))?;
 
@@ -268,17 +270,32 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
             UserEvent::DrawCircle {
                 center,
                 radius,
-                color,
+                fill_color,
+                line_color,
             } => {
                 let circle = vello::kurbo::Circle::new(center, radius);
-                let [r, g, b, a] = color.to_ne_bytes();
-                self.scene.fill(
-                    vello::peniko::Fill::NonZero,
-                    vello::kurbo::Affine::IDENTITY,
-                    vello::peniko::Color::rgba8(r, g, b, a),
-                    None,
-                    &circle,
-                );
+
+                if fill_color != 0 {
+                    let [r, g, b, a] = fill_color.to_ne_bytes();
+                    self.scene.fill(
+                        vello::peniko::Fill::NonZero,
+                        vello::kurbo::Affine::IDENTITY,
+                        vello::peniko::Color::rgba8(r, g, b, a),
+                        None,
+                        &circle,
+                    );
+                }
+
+                if line_color != 0 {
+                    let [r, g, b, a] = line_color.to_ne_bytes();
+                    self.scene.stroke(
+                        &vello::kurbo::Stroke::new(10.0),
+                        vello::kurbo::Affine::IDENTITY,
+                        vello::peniko::Color::rgba8(r, g, b, a),
+                        None,
+                        &circle,
+                    );
+                }
 
                 // TODO: set a flag and redraw lazily
                 render_state.window.request_redraw();
@@ -300,7 +317,8 @@ enum UserEvent {
     DrawCircle {
         center: vello::kurbo::Point,
         radius: f64,
-        color: u32,
+        fill_color: u32,
+        line_color: u32,
     },
 }
 

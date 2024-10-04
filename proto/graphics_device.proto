@@ -24,5 +24,6 @@ message DrawCircleRequest {
     double cx = 1;
     double cy = 2;
     double radius = 3;
-    uint32 color = 4;
+    uint32 fill_color = 4;
+    uint32 line_color = 5;
 }
