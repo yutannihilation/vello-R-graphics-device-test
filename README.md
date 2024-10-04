@@ -47,3 +47,46 @@ events. The emitted event will be handled in
 │ client  │             
 └─────────┘             
 ```
+
+# R Graphics Device API
+
+cf. <https://github.com/r-devel/r-svn/blob/main/src/include/R_ext/GraphicsDevice.h>
+
+* `activate`: do nothing
+* `circle`: draw [`kurbo::Circle`](https://docs.rs/kurbo/latest/kurbo/struct.Circle.html)
+* `clip`: [`vello::Scene::push_layer()`](https://docs.rs/vello/latest/vello/struct.Scene.html#method.push_layer) seems to handle this.
+* `close`: `event_loop.exit()`
+* `deactivate`: do nothing
+* `locator`: TBD
+* `line`: draw [`kurbo::Line`](https://docs.rs/kurbo/latest/kurbo/struct.Line.html)
+* `metricInfo`: TODO
+* `mode`:
+* `newPage`:
+* `polygon`:
+* `polyline`:
+* `rect`:
+* `path`:
+* `raster`:
+* `cap`:
+* `size`:
+* `strWidth`:
+* `text`:
+* `onExit`:
+* `newFrameConfirm`:
+* `textUTF8`:
+* `eventHelper`:
+* `holdflush`:
+* `setPattern`:
+* `releasePattern`:
+* `setClipPath`:
+* `releaseClipPath`:
+* `setMask`:
+* `releaseMask`:
+* `defineGroup`:
+* `useGroup`:
+* `releaseGroup`:
+* `stroke`:
+* `fill`:
+* `fillStroke`:
+* `capabilities`:
+* `glyph`:
