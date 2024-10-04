@@ -30,17 +30,17 @@ events. The emitted event will be handled in
 ```
 ┌─────────┐             
 │ device  │             
-└───▲────┘             
+└────▲────┘             
      │                  
      │ winit & vello API
 ┌────┴────┐             
 │eventloop│             
-└──▲─────┘             
+└───▲─────┘             
     │                   
     │ proxy             
 ┌───┴─────┐             
 │ server  │             
-└───▲────┘             
+└────▲────┘             
      │                  
      │ gRPC             
 ┌────┴────┐             
