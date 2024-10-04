@@ -51,29 +51,6 @@ impl GraphicsDevice for MyGraphicsDevice {
         Ok(Response::new(reply))
     }
 
-    async fn set_background(
-        &self,
-        request: Request<SetBackgroundRequest>,
-    ) -> Result<Response<Empty>, Status> {
-        println!("{:?}", request);
-
-        let SetBackgroundRequest { color } = request.get_ref();
-
-        let color = match color {
-            1 => Color::WHITE,
-            2 => Color::RED,
-            3 => Color::BLUE,
-            4 => Color::GREEN,
-            _ => Color::BLACK,
-        };
-        self.event_loop_proxy
-            .send_event(UserEvent::SetBackground { color })
-            .map_err(|e| Status::from_error(Box::new(e)))?;
-
-        let reply = Empty {};
-        Ok(Response::new(reply))
-    }
-
     async fn new_page(&self, request: Request<Empty>) -> Result<Response<Empty>, Status> {
         println!("{:?}", request);
 
@@ -346,10 +323,6 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
             UserEvent::CloseWindow => {
                 event_loop.exit();
             }
-            UserEvent::SetBackground { color } => {
-                self.background_color = color;
-                render_state.window.request_redraw();
-            }
             UserEvent::NewPage => {
                 self.scene.reset();
                 render_state.window.request_redraw();
@@ -464,9 +437,6 @@ struct StrokeParams {
 #[derive(Debug, Clone)]
 enum UserEvent {
     CloseWindow,
-    SetBackground {
-        color: Color,
-    },
     NewPage,
     DrawCircle {
         center: vello::kurbo::Point,

@@ -3,7 +3,6 @@ package graphics_device;
 
 service GraphicsDevice {
     rpc CloseWindow (Empty) returns (Empty);
-    rpc SetBackground (SetBackgroundRequest) returns (Empty);
     rpc NewPage(Empty) returns (Empty);
 
     rpc DrawCircle(DrawCircleRequest) returns (Empty);
@@ -13,10 +12,6 @@ service GraphicsDevice {
 }
 
 message Empty {}
-
-message SetBackgroundRequest {
-    int32 color = 1;
-}
 
 message StrokeParameters {
     uint32 color       = 1;

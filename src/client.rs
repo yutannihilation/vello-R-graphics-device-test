@@ -16,13 +16,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let request = tonic::Request::new(Empty {});
             client.close_window(request).await
         }
-        "bg" => {
-            let color = std::env::args().nth(2).unwrap_or_default();
-            let request = tonic::Request::new(SetBackgroundRequest {
-                color: color.parse().unwrap_or(1),
-            });
-            client.set_background(request).await
-        }
         "circle" => {
             let cx: f64 = std::env::args()
                 .nth(2)
