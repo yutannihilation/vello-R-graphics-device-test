@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 cx,
                 cy,
                 radius: 100.0,
-                fill_color,
+                fill_color: Some(fill_color),
                 stroke_params: Some(stroke_params),
             });
             client.draw_circle(request).await

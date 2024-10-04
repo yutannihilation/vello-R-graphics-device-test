@@ -100,19 +100,17 @@ impl GraphicsDevice for MyGraphicsDevice {
             stroke_params,
         } = request.into_inner();
 
-        if let Some(stroke_params) = stroke_params {
-            let stroke_color = stroke_params.color;
-            let stroke_params = stroke_params.into();
-            self.event_loop_proxy
-                .send_event(UserEvent::DrawCircle {
-                    center: vello::kurbo::Point::new(cx, cy),
-                    radius,
-                    fill_color,
-                    stroke_color,
-                    stroke_params,
-                })
-                .map_err(|e| Status::from_error(Box::new(e)))?;
-        }
+        let fill_params = fill_color.map(FillParams::from_request);
+        let stroke_params = stroke_params.map(StrokeParams::from_request);
+
+        self.event_loop_proxy
+            .send_event(UserEvent::DrawCircle {
+                center: vello::kurbo::Point::new(cx, cy),
+                radius,
+                fill_params,
+                stroke_params,
+            })
+            .map_err(|e| Status::from_error(Box::new(e)))?;
         let reply = Empty {};
         Ok(Response::new(reply))
     }
@@ -131,19 +129,24 @@ impl GraphicsDevice for MyGraphicsDevice {
             stroke_params,
         } = request.into_inner();
 
-        if let Some(stroke_params) = stroke_params {
-            let stroke_color = stroke_params.color;
-            let stroke_params = stroke_params.into();
+        let stroke_params = stroke_params.ok_or_else(|| {
+            Status::new(
+                tonic::Code::InvalidArgument,
+                "stroke_params must be specified",
+            )
+        })?;
 
-            self.event_loop_proxy
-                .send_event(UserEvent::DrawLine {
-                    p0: vello::kurbo::Point::new(x0, y0),
-                    p1: vello::kurbo::Point::new(x1, y1),
-                    stroke_color,
-                    stroke_params,
-                })
-                .map_err(|e| Status::from_error(Box::new(e)))?;
-        }
+        let stroke_color = stroke_params.color;
+        let stroke_params = stroke_params.into();
+
+        self.event_loop_proxy
+            .send_event(UserEvent::DrawLine {
+                p0: vello::kurbo::Point::new(x0, y0),
+                p1: vello::kurbo::Point::new(x1, y1),
+                stroke_color,
+                stroke_params,
+            })
+            .map_err(|e| Status::from_error(Box::new(e)))?;
 
         let reply = Empty {};
         Ok(Response::new(reply))
@@ -161,20 +164,25 @@ impl GraphicsDevice for MyGraphicsDevice {
             stroke_params,
         } = request.into_inner();
 
+        let stroke_params = stroke_params.ok_or_else(|| {
+            Status::new(
+                tonic::Code::InvalidArgument,
+                "stroke_params must be specified",
+            )
+        })?;
+
         let path = utils::xy_to_path(x, y, false);
 
-        if let Some(stroke_params) = stroke_params {
-            let stroke_color = stroke_params.color;
-            let stroke_params = stroke_params.into();
+        let stroke_color = stroke_params.color;
+        let stroke_params = stroke_params.into();
 
-            self.event_loop_proxy
-                .send_event(UserEvent::DrawPolyline {
-                    path,
-                    stroke_color,
-                    stroke_params,
-                })
-                .map_err(|e| Status::from_error(Box::new(e)))?;
-        }
+        self.event_loop_proxy
+            .send_event(UserEvent::DrawPolyline {
+                path,
+                stroke_color,
+                stroke_params,
+            })
+            .map_err(|e| Status::from_error(Box::new(e)))?;
 
         let reply = Empty {};
         Ok(Response::new(reply))
@@ -357,29 +365,26 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
             UserEvent::DrawCircle {
                 center,
                 radius,
-                fill_color,
-                stroke_color,
+                fill_params,
                 stroke_params,
             } => {
                 let circle = vello::kurbo::Circle::new(center, radius);
 
-                if fill_color != 0 {
-                    let [r, g, b, a] = fill_color.to_ne_bytes();
+                if let Some(fill_params) = fill_params {
                     self.scene.fill(
                         vello::peniko::Fill::NonZero,
                         vello::kurbo::Affine::IDENTITY,
-                        vello::peniko::Color::rgba8(r, g, b, a),
+                        fill_params.color,
                         None,
                         &circle,
                     );
                 }
 
-                if stroke_color != 0 && stroke_params.width > 0.0 {
-                    let [r, g, b, a] = stroke_color.to_ne_bytes();
+                if let Some(stroke_params) = stroke_params {
                     self.scene.stroke(
-                        &vello::kurbo::Stroke::new(stroke_params.width),
+                        &stroke_params.stroke,
                         vello::kurbo::Affine::IDENTITY,
-                        vello::peniko::Color::rgba8(r, g, b, a),
+                        stroke_params.color,
                         None,
                         &circle,
                     );
@@ -465,6 +470,17 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
 }
 
 #[derive(Debug, Clone)]
+struct FillParams {
+    color: vello::peniko::Color,
+}
+
+#[derive(Debug, Clone)]
+struct StrokeParams {
+    color: vello::peniko::Color,
+    stroke: vello::kurbo::Stroke,
+}
+
+#[derive(Debug, Clone)]
 enum UserEvent {
     CloseWindow,
     SetBackground {
@@ -474,9 +490,8 @@ enum UserEvent {
     DrawCircle {
         center: vello::kurbo::Point,
         radius: f64,
-        fill_color: u32,
-        stroke_color: u32,
-        stroke_params: vello::kurbo::Stroke,
+        fill_params: Option<FillParams>,
+        stroke_params: Option<StrokeParams>,
     },
     DrawLine {
         p0: vello::kurbo::Point,
