@@ -103,20 +103,22 @@ impl GraphicsDevice for MyGraphicsDevice {
             cy,
             radius,
             fill_color,
-            stroke_color,
-            stroke_width,
+            stroke_params,
         } = request.get_ref();
 
-        self.event_loop_proxy
-            .send_event(UserEvent::DrawCircle {
-                center: vello::kurbo::Point::new(*cx, *cy),
-                radius: *radius,
-                fill_color: *fill_color,
-                stroke_color: *stroke_color,
-                stroke_width: *stroke_width,
-            })
-            .map_err(|e| Status::from_error(Box::new(e)))?;
-
+        if let Some(stroke_params) = stroke_params {
+            let stroke_color = stroke_params.color;
+            let stroke_params = stroke_params.into();
+            self.event_loop_proxy
+                .send_event(UserEvent::DrawCircle {
+                    center: vello::kurbo::Point::new(*cx, *cy),
+                    radius: *radius,
+                    fill_color: *fill_color,
+                    stroke_color,
+                    stroke_params,
+                })
+                .map_err(|e| Status::from_error(Box::new(e)))?;
+        }
         let reply = Empty {};
         Ok(Response::new(reply))
     }
@@ -305,7 +307,7 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                 radius,
                 fill_color,
                 stroke_color,
-                stroke_width,
+                stroke_params,
             } => {
                 let circle = vello::kurbo::Circle::new(center, radius);
 
@@ -320,10 +322,10 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                     );
                 }
 
-                if stroke_color != 0 && stroke_width > 0.0 {
+                if stroke_color != 0 && stroke_params.width > 0.0 {
                     let [r, g, b, a] = stroke_color.to_ne_bytes();
                     self.scene.stroke(
-                        &vello::kurbo::Stroke::new(stroke_width),
+                        &vello::kurbo::Stroke::new(stroke_params.width),
                         vello::kurbo::Affine::IDENTITY,
                         vello::peniko::Color::rgba8(r, g, b, a),
                         None,
@@ -375,7 +377,7 @@ enum UserEvent {
         radius: f64,
         fill_color: u32,
         stroke_color: u32,
-        stroke_width: f64,
+        stroke_params: vello::kurbo::Stroke,
     },
     DrawLine {
         p0: vello::kurbo::Point,
