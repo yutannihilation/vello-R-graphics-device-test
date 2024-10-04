@@ -160,14 +160,49 @@ impl GraphicsDevice for MyGraphicsDevice {
             y,
             stroke_params,
         } = request.into_inner();
+
+        let path = utils::xy_to_path(x, y, false);
+
         if let Some(stroke_params) = stroke_params {
             let stroke_color = stroke_params.color;
             let stroke_params = stroke_params.into();
-            let path = utils::xy_to_path(x, y, false);
 
             self.event_loop_proxy
                 .send_event(UserEvent::DrawPolyline {
                     path,
+                    stroke_color,
+                    stroke_params,
+                })
+                .map_err(|e| Status::from_error(Box::new(e)))?;
+        }
+
+        let reply = Empty {};
+        Ok(Response::new(reply))
+    }
+
+    async fn draw_polygon(
+        &self,
+        request: Request<DrawPolygonRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        println!("{:?}", request);
+
+        let DrawPolygonRequest {
+            x,
+            y,
+            fill_color,
+            stroke_params,
+        } = request.into_inner();
+
+        let path = utils::xy_to_path(x, y, true);
+
+        if let Some(stroke_params) = stroke_params {
+            let stroke_color = stroke_params.color;
+            let stroke_params = stroke_params.into();
+
+            self.event_loop_proxy
+                .send_event(UserEvent::DrawPolygon {
+                    path,
+                    fill_color,
                     stroke_color,
                     stroke_params,
                 })
@@ -394,6 +429,37 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                 // TODO: set a flag and redraw lazily
                 render_state.window.request_redraw();
             }
+            UserEvent::DrawPolygon {
+                path,
+                fill_color,
+                stroke_color,
+                stroke_params,
+            } => {
+                if fill_color != 0 {
+                    let [r, g, b, a] = fill_color.to_ne_bytes();
+                    self.scene.fill(
+                        vello::peniko::Fill::NonZero,
+                        vello::kurbo::Affine::IDENTITY,
+                        vello::peniko::Color::rgba8(r, g, b, a),
+                        None,
+                        &path,
+                    );
+                }
+
+                if stroke_color != 0 && stroke_params.width > 0.0 {
+                    let [r, g, b, a] = stroke_color.to_ne_bytes();
+                    self.scene.stroke(
+                        &stroke_params,
+                        vello::kurbo::Affine::IDENTITY,
+                        vello::peniko::Color::rgba8(r, g, b, a),
+                        None,
+                        &path,
+                    );
+                }
+
+                // TODO: set a flag and redraw lazily
+                render_state.window.request_redraw();
+            }
         };
     }
 }
@@ -420,6 +486,12 @@ enum UserEvent {
     },
     DrawPolyline {
         path: vello::kurbo::BezPath,
+        stroke_color: u32,
+        stroke_params: vello::kurbo::Stroke,
+    },
+    DrawPolygon {
+        path: vello::kurbo::BezPath,
+        fill_color: u32,
         stroke_color: u32,
         stroke_params: vello::kurbo::Stroke,
     },

@@ -113,6 +113,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
             client.draw_polyline(request).await
         }
+        "polygon" => {
+            let vello::peniko::Color { r, g, b, a } = vello::peniko::Color::PURPLE;
+            let color = u32::from_ne_bytes([r, g, b, a]);
+            let width = 15.0;
+            let stroke_params = StrokeParameters {
+                color,
+                width,
+                linetype: 1,
+                join: 1,
+                miter_limit: 1.0,
+                cap: 1,
+            };
+            let request = tonic::Request::new(DrawPolygonRequest {
+                x: vec![100.0, 300.0, 500.0],
+                y: vec![100.0, 500.0, 300.0],
+                fill_color: u32::from_ne_bytes([0, 0, b, a]),
+                stroke_params: Some(stroke_params),
+            });
+            client.draw_polygon(request).await
+        }
         _ => client.new_page(Empty {}).await,
     }?;
 
