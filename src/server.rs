@@ -17,11 +17,10 @@ use winit::{
 
 use tonic::{transport::Server, Request, Response, Status};
 
+use graphics_device::graphics_device_server::{GraphicsDevice, GraphicsDeviceServer};
 use graphics_device::{
-    graphics_device_server::{GraphicsDevice, GraphicsDeviceServer},
-    DrawCircleRequest,
+    DrawCircleRequest, DrawLineRequest, Empty, ResizeWindowRequest, SetBackgroundRequest,
 };
-use graphics_device::{Empty, ResizeWindowRequest, SetBackgroundRequest};
 
 pub mod graphics_device {
     tonic::include_proto!("graphics_device");
@@ -113,6 +112,34 @@ impl GraphicsDevice for MyGraphicsDevice {
                 center: vello::kurbo::Point::new(*cx, *cy),
                 radius: *radius,
                 fill_color: *fill_color,
+                stroke_color: *stroke_color,
+                stroke_width: *stroke_width,
+            })
+            .map_err(|e| Status::from_error(Box::new(e)))?;
+
+        let reply = Empty {};
+        Ok(Response::new(reply))
+    }
+
+    async fn draw_line(
+        &self,
+        request: Request<DrawLineRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        println!("{:?}", request);
+
+        let DrawLineRequest {
+            x0,
+            y0,
+            x1,
+            y1,
+            stroke_color,
+            stroke_width,
+        } = request.get_ref();
+
+        self.event_loop_proxy
+            .send_event(UserEvent::DrawLine {
+                p0: vello::kurbo::Point::new(*x0, *y0),
+                p1: vello::kurbo::Point::new(*x1, *y1),
                 stroke_color: *stroke_color,
                 stroke_width: *stroke_width,
             })
@@ -303,6 +330,28 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                 // TODO: set a flag and redraw lazily
                 render_state.window.request_redraw();
             }
+            UserEvent::DrawLine {
+                p0,
+                p1,
+                stroke_color,
+                stroke_width,
+            } => {
+                let line = vello::kurbo::Line::new(p0, p1);
+
+                if stroke_color != 0 && stroke_width > 0.0 {
+                    let [r, g, b, a] = stroke_color.to_ne_bytes();
+                    self.scene.stroke(
+                        &vello::kurbo::Stroke::new(stroke_width),
+                        vello::kurbo::Affine::IDENTITY,
+                        vello::peniko::Color::rgba8(r, g, b, a),
+                        None,
+                        &line,
+                    );
+                }
+
+                // TODO: set a flag and redraw lazily
+                render_state.window.request_redraw();
+            }
         };
     }
 }
@@ -321,6 +370,12 @@ enum UserEvent {
         center: vello::kurbo::Point,
         radius: f64,
         fill_color: u32,
+        stroke_color: u32,
+        stroke_width: f64,
+    },
+    DrawLine {
+        p0: vello::kurbo::Point,
+        p1: vello::kurbo::Point,
         stroke_color: u32,
         stroke_width: f64,
     },
