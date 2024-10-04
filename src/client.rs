@@ -1,7 +1,5 @@
 use graphics_device::graphics_device_client::GraphicsDeviceClient;
-use graphics_device::{
-    DrawCircleRequest, DrawLineRequest, Empty, ResizeWindowRequest, SetBackgroundRequest,
-};
+use graphics_device::*;
 
 pub mod graphics_device {
     tonic::include_proto!("graphics_device");
@@ -67,16 +65,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let y1 = y0 + 100.0;
 
             let vello::peniko::Color { r, g, b, a } = vello::peniko::Color::PURPLE;
-            let stroke_color = u32::from_ne_bytes([r, g, b, a]);
-            let stroke_width = 15.0;
+            let color = u32::from_ne_bytes([r, g, b, a]);
+            let width = 15.0;
+            let stroke_params = StrokeParameters { color, width };
 
             let request = tonic::Request::new(DrawLineRequest {
                 x0,
                 y0,
                 x1,
                 y1,
-                stroke_color,
-                stroke_width,
+                stroke_params: Some(stroke_params),
             });
             client.draw_line(request).await
         }

@@ -21,6 +21,17 @@ message SetBackgroundRequest {
     int32 color = 1;
 }
 
+message StrokeParameters {
+    uint32 color       = 1;
+    double width       = 2;
+    int32 type         = 3;
+    // linetype can be negative (LTY_BLANK)
+    uint32 join        = 4;
+    double miter_limit = 5;
+    // vello allows to use different cap types for start and end, but R use one type for both.
+    uint32 cap         = 6;
+}
+
 message DrawCircleRequest {
     double cx = 1;
     double cy = 2;
@@ -35,6 +46,5 @@ message DrawLineRequest {
     double y0 = 2;
     double x1 = 3;
     double y1 = 4;
-    uint32 stroke_color = 5;
-    double stroke_width = 6;
+    StrokeParameters stroke_params = 5;
 }

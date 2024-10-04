@@ -18,9 +18,7 @@ use winit::{
 use tonic::{transport::Server, Request, Response, Status};
 
 use graphics_device::graphics_device_server::{GraphicsDevice, GraphicsDeviceServer};
-use graphics_device::{
-    DrawCircleRequest, DrawLineRequest, Empty, ResizeWindowRequest, SetBackgroundRequest,
-};
+use graphics_device::*;
 
 pub mod graphics_device {
     tonic::include_proto!("graphics_device");
