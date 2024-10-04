@@ -54,6 +54,6 @@ message DrawPolylineRequest {
 message DrawPolygonRequest {
     repeated double x = 1;
     repeated double y = 2;
-    uint32 fill_color = 4;
-    StrokeParameters stroke_params = 3;
+    optional uint32 fill_color = 4;
+    optional StrokeParameters stroke_params = 3;
 }

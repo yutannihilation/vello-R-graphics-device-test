@@ -128,7 +128,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let request = tonic::Request::new(DrawPolygonRequest {
                 x: vec![100.0, 300.0, 500.0],
                 y: vec![100.0, 500.0, 300.0],
-                fill_color: u32::from_ne_bytes([0, 0, b, a]),
+                fill_color: Some(u32::from_ne_bytes([0, 0, b, a])),
                 stroke_params: Some(stroke_params),
             });
             client.draw_polygon(request).await

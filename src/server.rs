@@ -136,14 +136,12 @@ impl GraphicsDevice for MyGraphicsDevice {
             )
         })?;
 
-        let stroke_color = stroke_params.color;
-        let stroke_params = stroke_params.into();
+        let stroke_params = StrokeParams::from_request(stroke_params);
 
         self.event_loop_proxy
             .send_event(UserEvent::DrawLine {
                 p0: vello::kurbo::Point::new(x0, y0),
                 p1: vello::kurbo::Point::new(x1, y1),
-                stroke_color,
                 stroke_params,
             })
             .map_err(|e| Status::from_error(Box::new(e)))?;
@@ -173,13 +171,11 @@ impl GraphicsDevice for MyGraphicsDevice {
 
         let path = utils::xy_to_path(x, y, false);
 
-        let stroke_color = stroke_params.color;
-        let stroke_params = stroke_params.into();
+        let stroke_params = StrokeParams::from_request(stroke_params);
 
         self.event_loop_proxy
             .send_event(UserEvent::DrawPolyline {
                 path,
-                stroke_color,
                 stroke_params,
             })
             .map_err(|e| Status::from_error(Box::new(e)))?;
@@ -201,21 +197,17 @@ impl GraphicsDevice for MyGraphicsDevice {
             stroke_params,
         } = request.into_inner();
 
+        let fill_params = fill_color.map(FillParams::from_request);
+        let stroke_params = stroke_params.map(StrokeParams::from_request);
         let path = utils::xy_to_path(x, y, true);
 
-        if let Some(stroke_params) = stroke_params {
-            let stroke_color = stroke_params.color;
-            let stroke_params = stroke_params.into();
-
-            self.event_loop_proxy
-                .send_event(UserEvent::DrawPolygon {
-                    path,
-                    fill_color,
-                    stroke_color,
-                    stroke_params,
-                })
-                .map_err(|e| Status::from_error(Box::new(e)))?;
-        }
+        self.event_loop_proxy
+            .send_event(UserEvent::DrawPolygon {
+                path,
+                fill_params,
+                stroke_params,
+            })
+            .map_err(|e| Status::from_error(Box::new(e)))?;
 
         let reply = Empty {};
         Ok(Response::new(reply))
@@ -396,67 +388,56 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
             UserEvent::DrawLine {
                 p0,
                 p1,
-                stroke_color,
                 stroke_params,
             } => {
                 let line = vello::kurbo::Line::new(p0, p1);
 
-                if stroke_color != 0 && stroke_params.width > 0.0 {
-                    let [r, g, b, a] = stroke_color.to_ne_bytes();
-                    self.scene.stroke(
-                        &stroke_params,
-                        vello::kurbo::Affine::IDENTITY,
-                        vello::peniko::Color::rgba8(r, g, b, a),
-                        None,
-                        &line,
-                    );
-                }
+                self.scene.stroke(
+                    &stroke_params.stroke,
+                    vello::kurbo::Affine::IDENTITY,
+                    stroke_params.color,
+                    None,
+                    &line,
+                );
 
                 // TODO: set a flag and redraw lazily
                 render_state.window.request_redraw();
             }
             UserEvent::DrawPolyline {
                 path,
-                stroke_color,
                 stroke_params,
             } => {
-                if stroke_color != 0 && stroke_params.width > 0.0 {
-                    let [r, g, b, a] = stroke_color.to_ne_bytes();
-                    self.scene.stroke(
-                        &stroke_params,
-                        vello::kurbo::Affine::IDENTITY,
-                        vello::peniko::Color::rgba8(r, g, b, a),
-                        None,
-                        &path,
-                    );
-                }
+                self.scene.stroke(
+                    &stroke_params.stroke,
+                    vello::kurbo::Affine::IDENTITY,
+                    stroke_params.color,
+                    None,
+                    &path,
+                );
 
                 // TODO: set a flag and redraw lazily
                 render_state.window.request_redraw();
             }
             UserEvent::DrawPolygon {
                 path,
-                fill_color,
-                stroke_color,
+                fill_params,
                 stroke_params,
             } => {
-                if fill_color != 0 {
-                    let [r, g, b, a] = fill_color.to_ne_bytes();
+                if let Some(fill_params) = fill_params {
                     self.scene.fill(
                         vello::peniko::Fill::NonZero,
                         vello::kurbo::Affine::IDENTITY,
-                        vello::peniko::Color::rgba8(r, g, b, a),
+                        fill_params.color,
                         None,
                         &path,
                     );
                 }
 
-                if stroke_color != 0 && stroke_params.width > 0.0 {
-                    let [r, g, b, a] = stroke_color.to_ne_bytes();
+                if let Some(stroke_params) = stroke_params {
                     self.scene.stroke(
-                        &stroke_params,
+                        &stroke_params.stroke,
                         vello::kurbo::Affine::IDENTITY,
-                        vello::peniko::Color::rgba8(r, g, b, a),
+                        stroke_params.color,
                         None,
                         &path,
                     );
@@ -496,19 +477,16 @@ enum UserEvent {
     DrawLine {
         p0: vello::kurbo::Point,
         p1: vello::kurbo::Point,
-        stroke_color: u32,
-        stroke_params: vello::kurbo::Stroke,
+        stroke_params: StrokeParams,
     },
     DrawPolyline {
         path: vello::kurbo::BezPath,
-        stroke_color: u32,
-        stroke_params: vello::kurbo::Stroke,
+        stroke_params: StrokeParams,
     },
     DrawPolygon {
         path: vello::kurbo::BezPath,
-        fill_color: u32,
-        stroke_color: u32,
-        stroke_params: vello::kurbo::Stroke,
+        fill_params: Option<FillParams>,
+        stroke_params: Option<StrokeParams>,
     },
 }
 
