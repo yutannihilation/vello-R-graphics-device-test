@@ -130,18 +130,27 @@ impl GraphicsDevice for MyGraphicsDevice {
             y0,
             x1,
             y1,
-            stroke_color,
-            stroke_width,
+            stroke_params,
         } = request.get_ref();
 
-        self.event_loop_proxy
-            .send_event(UserEvent::DrawLine {
-                p0: vello::kurbo::Point::new(*x0, *y0),
-                p1: vello::kurbo::Point::new(*x1, *y1),
-                stroke_color: *stroke_color,
-                stroke_width: *stroke_width,
-            })
-            .map_err(|e| Status::from_error(Box::new(e)))?;
+        if let Some(StrokeParameters {
+            color,
+            width,
+            linetype,
+            join,
+            miter_limit,
+            cap,
+        }) = stroke_params
+        {
+            self.event_loop_proxy
+                .send_event(UserEvent::DrawLine {
+                    p0: vello::kurbo::Point::new(*x0, *y0),
+                    p1: vello::kurbo::Point::new(*x1, *y1),
+                    stroke_color: *color,
+                    stroke_width: *width,
+                })
+                .map_err(|e| Status::from_error(Box::new(e)))?;
+        }
 
         let reply = Empty {};
         Ok(Response::new(reply))

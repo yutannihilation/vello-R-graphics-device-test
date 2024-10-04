@@ -24,7 +24,7 @@ message SetBackgroundRequest {
 message StrokeParameters {
     uint32 color       = 1;
     double width       = 2;
-    int32 type         = 3;
+    int32 linetype     = 3;
     // linetype can be negative (LTY_BLANK)
     uint32 join        = 4;
     double miter_limit = 5;
