@@ -148,6 +148,42 @@ impl GraphicsDevice for MyGraphicsDevice {
         let reply = Empty {};
         Ok(Response::new(reply))
     }
+
+    async fn draw_polyline(
+        &self,
+        request: Request<DrawPolylineRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        println!("{:?}", request);
+
+        let DrawPolylineRequest {
+            x,
+            y,
+            stroke_params,
+        } = request.get_ref();
+        if let Some(stroke_params) = stroke_params {
+            let stroke_color = stroke_params.color;
+            let stroke_params = stroke_params.into();
+
+            let mut points = x.iter().zip(y.iter());
+            if let Some(first) = points.next() {
+                let mut path = vello::kurbo::BezPath::new();
+                path.move_to(vello::kurbo::Point::new(*first.0, *first.1));
+                for (x, y) in points {
+                    path.line_to(vello::kurbo::Point::new(*x, *y));
+                }
+                self.event_loop_proxy
+                    .send_event(UserEvent::DrawPolyline {
+                        path,
+                        stroke_color,
+                        stroke_params,
+                    })
+                    .map_err(|e| Status::from_error(Box::new(e)))?;
+            }
+        }
+
+        let reply = Empty {};
+        Ok(Response::new(reply))
+    }
 }
 
 pub struct ActiveRenderState<'a> {
@@ -346,6 +382,25 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                 // TODO: set a flag and redraw lazily
                 render_state.window.request_redraw();
             }
+            UserEvent::DrawPolyline {
+                path,
+                stroke_color,
+                stroke_params,
+            } => {
+                if stroke_color != 0 && stroke_params.width > 0.0 {
+                    let [r, g, b, a] = stroke_color.to_ne_bytes();
+                    self.scene.stroke(
+                        &stroke_params,
+                        vello::kurbo::Affine::IDENTITY,
+                        vello::peniko::Color::rgba8(r, g, b, a),
+                        None,
+                        &path,
+                    );
+                }
+
+                // TODO: set a flag and redraw lazily
+                render_state.window.request_redraw();
+            }
         };
     }
 }
@@ -367,6 +422,11 @@ enum UserEvent {
     DrawLine {
         p0: vello::kurbo::Point,
         p1: vello::kurbo::Point,
+        stroke_color: u32,
+        stroke_params: vello::kurbo::Stroke,
+    },
+    DrawPolyline {
+        path: vello::kurbo::BezPath,
         stroke_color: u32,
         stroke_params: vello::kurbo::Stroke,
     },
