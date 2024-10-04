@@ -98,16 +98,16 @@ impl GraphicsDevice for MyGraphicsDevice {
             radius,
             fill_color,
             stroke_params,
-        } = request.get_ref();
+        } = request.into_inner();
 
         if let Some(stroke_params) = stroke_params {
             let stroke_color = stroke_params.color;
             let stroke_params = stroke_params.into();
             self.event_loop_proxy
                 .send_event(UserEvent::DrawCircle {
-                    center: vello::kurbo::Point::new(*cx, *cy),
-                    radius: *radius,
-                    fill_color: *fill_color,
+                    center: vello::kurbo::Point::new(cx, cy),
+                    radius,
+                    fill_color,
                     stroke_color,
                     stroke_params,
                 })
@@ -129,7 +129,7 @@ impl GraphicsDevice for MyGraphicsDevice {
             x1,
             y1,
             stroke_params,
-        } = request.get_ref();
+        } = request.into_inner();
 
         if let Some(stroke_params) = stroke_params {
             let stroke_color = stroke_params.color;
@@ -137,8 +137,8 @@ impl GraphicsDevice for MyGraphicsDevice {
 
             self.event_loop_proxy
                 .send_event(UserEvent::DrawLine {
-                    p0: vello::kurbo::Point::new(*x0, *y0),
-                    p1: vello::kurbo::Point::new(*x1, *y1),
+                    p0: vello::kurbo::Point::new(x0, y0),
+                    p1: vello::kurbo::Point::new(x1, y1),
                     stroke_color,
                     stroke_params,
                 })
@@ -159,26 +159,19 @@ impl GraphicsDevice for MyGraphicsDevice {
             x,
             y,
             stroke_params,
-        } = request.get_ref();
+        } = request.into_inner();
         if let Some(stroke_params) = stroke_params {
             let stroke_color = stroke_params.color;
             let stroke_params = stroke_params.into();
+            let path = utils::xy_to_path(x, y, false);
 
-            let mut points = x.iter().zip(y.iter());
-            if let Some(first) = points.next() {
-                let mut path = vello::kurbo::BezPath::new();
-                path.move_to(vello::kurbo::Point::new(*first.0, *first.1));
-                for (x, y) in points {
-                    path.line_to(vello::kurbo::Point::new(*x, *y));
-                }
-                self.event_loop_proxy
-                    .send_event(UserEvent::DrawPolyline {
-                        path,
-                        stroke_color,
-                        stroke_params,
-                    })
-                    .map_err(|e| Status::from_error(Box::new(e)))?;
-            }
+            self.event_loop_proxy
+                .send_event(UserEvent::DrawPolyline {
+                    path,
+                    stroke_color,
+                    stroke_params,
+                })
+                .map_err(|e| Status::from_error(Box::new(e)))?;
         }
 
         let reply = Empty {};

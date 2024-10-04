@@ -1,5 +1,5 @@
-impl From<&crate::StrokeParameters> for vello::kurbo::Stroke {
-    fn from(value: &crate::StrokeParameters) -> Self {
+impl From<crate::StrokeParameters> for vello::kurbo::Stroke {
+    fn from(value: crate::StrokeParameters) -> Self {
         // cf. https://github.com/r-devel/r-svn/blob/6ad1e0f2702fd0308e4f3caac2e22541d014ab6a/src/include/R_ext/GraphicsEngine.h#L183-L187
         let join = match value.join {
             1 => vello::kurbo::Join::Round,
@@ -38,4 +38,28 @@ impl From<&crate::StrokeParameters> for vello::kurbo::Stroke {
             dash_offset: 0.0,
         }
     }
+}
+
+// Note: BezPath allows more than lines, but R's graphics API currently uses lines only.
+pub(crate) fn xy_to_path(x: Vec<f64>, y: Vec<f64>, close: bool) -> vello::kurbo::BezPath {
+    let mut path = vello::kurbo::BezPath::new();
+
+    let x_iter = x.into_iter();
+    let y_iter = y.into_iter();
+    let mut points = x_iter.zip(y_iter);
+    if let Some(first) = points.next() {
+        path.move_to(vello::kurbo::Point::new(first.0, first.1));
+    } else {
+        return path;
+    }
+
+    for (x, y) in points {
+        path.line_to(vello::kurbo::Point::new(x, y));
+    }
+
+    if close {
+        path.close_path();
+    }
+
+    path
 }
