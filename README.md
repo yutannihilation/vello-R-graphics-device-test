@@ -60,8 +60,8 @@ cf. <https://github.com/r-devel/r-svn/blob/main/src/include/R_ext/GraphicsDevice
 * `locator`: TBD
 * `line`: draw [`kurbo::Line`](https://docs.rs/kurbo/latest/kurbo/struct.Line.html)
 * `metricInfo`: use `vello::skrifa`. [the official example](https://github.com/linebender/vello/blob/7647a14838a9bfe86c6f93abe62c8a7c2e6a7115/examples/scenes/src/simple_text.rs#L8)
-* `mode`:
-* `newPage`:
+* `mode`: do nothing.
+* `newPage`: Currently, just use `scene.reset()`. For non-interactive usage, this needs to handle filenames.
 * `polygon`:
 * `polyline`:
 * `rect`:

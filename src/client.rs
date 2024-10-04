@@ -93,13 +93,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
             client.draw_line(request).await
         }
-        _ => {
-            let request = tonic::Request::new(ResizeWindowRequest {
-                height: 100,
-                width: 100,
-            });
-            client.resize_window(request).await
-        }
+        _ => client.new_page(Empty {}).await,
     }?;
 
     println!("RESPONSE={:?}", response);

@@ -5,6 +5,7 @@ service GraphicsDevice {
     rpc ResizeWindow (ResizeWindowRequest) returns (Empty);
     rpc CloseWindow (Empty) returns (Empty);
     rpc SetBackground (SetBackgroundRequest) returns (Empty);
+    rpc NewPage(Empty) returns (Empty);
 
     rpc DrawCircle(DrawCircleRequest) returns (Empty);
     rpc DrawLine(DrawLineRequest) returns (Empty);

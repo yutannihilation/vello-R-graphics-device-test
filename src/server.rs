@@ -92,6 +92,19 @@ impl GraphicsDevice for MyGraphicsDevice {
         let reply = Empty {};
         Ok(Response::new(reply))
     }
+
+    async fn new_page(&self, request: Request<Empty>) -> Result<Response<Empty>, Status> {
+        println!("{:?}", request);
+
+        self.event_loop_proxy
+            .send_event(UserEvent::NewPage)
+            .map_err(|e| Status::from_error(Box::new(e)))?;
+
+        let reply = Empty {};
+
+        Ok(Response::new(reply))
+    }
+
     async fn draw_circle(
         &self,
         request: Request<DrawCircleRequest>,
@@ -302,6 +315,10 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                 self.background_color = color;
                 render_state.window.request_redraw();
             }
+            UserEvent::NewPage => {
+                self.scene.reset();
+                render_state.window.request_redraw();
+            }
             UserEvent::DrawCircle {
                 center,
                 radius,
@@ -372,6 +389,7 @@ enum UserEvent {
     SetBackground {
         color: Color,
     },
+    NewPage,
     DrawCircle {
         center: vello::kurbo::Point,
         radius: f64,
