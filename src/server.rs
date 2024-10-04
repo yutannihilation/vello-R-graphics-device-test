@@ -1,6 +1,8 @@
 // The code related to vello is based on the example code on vello's repo
 // (examples/simple/main.rs).
 
+mod utils;
+
 use std::{num::NonZeroUsize, sync::Arc};
 
 use vello::{
@@ -133,21 +135,16 @@ impl GraphicsDevice for MyGraphicsDevice {
             stroke_params,
         } = request.get_ref();
 
-        if let Some(StrokeParameters {
-            color,
-            width,
-            linetype,
-            join,
-            miter_limit,
-            cap,
-        }) = stroke_params
-        {
+        if let Some(stroke_params) = stroke_params {
+            let stroke_color = stroke_params.color;
+            let stroke_params = stroke_params.into();
+
             self.event_loop_proxy
                 .send_event(UserEvent::DrawLine {
                     p0: vello::kurbo::Point::new(*x0, *y0),
                     p1: vello::kurbo::Point::new(*x1, *y1),
-                    stroke_color: *color,
-                    stroke_width: *width,
+                    stroke_color,
+                    stroke_params,
                 })
                 .map_err(|e| Status::from_error(Box::new(e)))?;
         }
@@ -341,14 +338,14 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                 p0,
                 p1,
                 stroke_color,
-                stroke_width,
+                stroke_params,
             } => {
                 let line = vello::kurbo::Line::new(p0, p1);
 
-                if stroke_color != 0 && stroke_width > 0.0 {
+                if stroke_color != 0 && stroke_params.width > 0.0 {
                     let [r, g, b, a] = stroke_color.to_ne_bytes();
                     self.scene.stroke(
-                        &vello::kurbo::Stroke::new(stroke_width),
+                        &stroke_params,
                         vello::kurbo::Affine::IDENTITY,
                         vello::peniko::Color::rgba8(r, g, b, a),
                         None,
@@ -363,7 +360,7 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum UserEvent {
     ResizeWindow {
         height: i32,
@@ -384,7 +381,7 @@ enum UserEvent {
         p0: vello::kurbo::Point,
         p1: vello::kurbo::Point,
         stroke_color: u32,
-        stroke_width: f64,
+        stroke_params: vello::kurbo::Stroke,
     },
 }
 
