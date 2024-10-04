@@ -39,25 +39,6 @@ impl MyGraphicsDevice {
 
 #[tonic::async_trait]
 impl GraphicsDevice for MyGraphicsDevice {
-    async fn resize_window(
-        &self,
-        request: Request<ResizeWindowRequest>,
-    ) -> Result<Response<Empty>, Status> {
-        println!("{:?}", request);
-
-        let ResizeWindowRequest { width, height } = request.get_ref();
-        self.event_loop_proxy
-            .send_event(UserEvent::ResizeWindow {
-                height: *height,
-                width: *width,
-            })
-            .map_err(|e| Status::from_error(Box::new(e)))?;
-
-        let reply = Empty {};
-
-        Ok(Response::new(reply))
-    }
-
     async fn close_window(&self, request: Request<Empty>) -> Result<Response<Empty>, Status> {
         println!("{:?}", request);
 
@@ -298,16 +279,6 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
         };
 
         match event {
-            UserEvent::ResizeWindow { height, width } => {
-                let sizes = render_state.window.inner_size();
-                // TODO: handle error
-                let _res = render_state
-                    .window
-                    .request_inner_size(winit::dpi::LogicalSize::new(
-                        (sizes.width as i32 + height) as u32,
-                        (sizes.height as i32 + width) as u32,
-                    ));
-            }
             UserEvent::CloseWindow => {
                 event_loop.exit();
             }
@@ -381,10 +352,6 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
 
 #[derive(Debug, Clone)]
 enum UserEvent {
-    ResizeWindow {
-        height: i32,
-        width: i32,
-    },
     CloseWindow,
     SetBackground {
         color: Color,
