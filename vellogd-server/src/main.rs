@@ -224,6 +224,26 @@ impl GraphicsDevice for VelloGraphicsDevice {
         let reply = Empty {};
         Ok(Response::new(reply))
     }
+
+    // async fn draw_path(
+    //     &self,
+    //     request: Request<DrawPathRequest>,
+    // ) -> Result<Response<Empty>, Status> {
+    //     // TODO
+
+    //     let x = slice::from_raw_parts(x, n as _).iter();
+    //     let y = slice::from_raw_parts(y, n as _).iter();
+    //     // TODO: does this map has some overhead? If so, maybe we should change the interface?
+    //     let mut coords_flat = x.zip(y).map(|(&x, &y)| (x, y));
+
+    //     let coords = nper.iter().map(|&np| {
+    //         coords_flat
+    //             .by_ref()
+    //             .take(np as _)
+    //             // TODO: Probably this don't need to be collected.
+    //             .collect::<Vec<(f64, f64)>>()
+    //     });
+    // }
 }
 
 pub struct ActiveRenderState<'a> {
