@@ -1,9 +1,8 @@
-use graphics_device::graphics_device_client::GraphicsDeviceClient;
-use graphics_device::*;
+use vellogd_protocol::graphics_device_client::GraphicsDeviceClient;
+use vellogd_protocol::*;
 
-pub mod graphics_device {
-    tonic::include_proto!("graphics_device");
-}
+const MEDIUM_PURPLE: u32 = u32::from_ne_bytes([147, 112, 219, 255]);
+const PALE_GREEN: u32 = u32::from_ne_bytes([152, 251, 152, 255]);
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,10 +27,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .parse()
                 .unwrap_or(100.0);
 
-            let vello::peniko::Color { r, g, b, a } = vello::peniko::Color::PURPLE;
-            let fill_color = u32::from_ne_bytes([r, g, b, a]);
+            let fill_color = MEDIUM_PURPLE;
 
-            let stroke_color = u32::from_ne_bytes([r, 0, 0, a]);
+            let stroke_color = PALE_GREEN;
             let stroke_width = 10.0;
             let stroke_params = StrokeParameters {
                 color: stroke_color,
@@ -65,8 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let x1 = x0 + 100.0;
             let y1 = y0 + 100.0;
 
-            let vello::peniko::Color { r, g, b, a } = vello::peniko::Color::PURPLE;
-            let color = u32::from_ne_bytes([r, g, b, a]);
+            let color = MEDIUM_PURPLE;
             let width = 15.0;
             let stroke_params = StrokeParameters {
                 color,
@@ -87,8 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             client.draw_line(request).await
         }
         "lines" => {
-            let vello::peniko::Color { r, g, b, a } = vello::peniko::Color::PURPLE;
-            let color = u32::from_ne_bytes([r, g, b, a]);
+            let color = MEDIUM_PURPLE;
             let width = 15.0;
             let stroke_params = StrokeParameters {
                 color,
@@ -107,8 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             client.draw_polyline(request).await
         }
         "polygon" => {
-            let vello::peniko::Color { r, g, b, a } = vello::peniko::Color::PURPLE;
-            let color = u32::from_ne_bytes([r, g, b, a]);
+            let color = MEDIUM_PURPLE;
             let width = 15.0;
             let stroke_params = StrokeParameters {
                 color,
@@ -121,7 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let request = tonic::Request::new(DrawPolygonRequest {
                 x: vec![100.0, 300.0, 500.0],
                 y: vec![100.0, 500.0, 300.0],
-                fill_color: Some(u32::from_ne_bytes([0, 0, b, a])),
+                fill_color: Some(PALE_GREEN),
                 stroke_params: Some(stroke_params),
             });
             client.draw_polygon(request).await
@@ -139,8 +134,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .unwrap_or(100.0);
             let text = std::env::args().nth(4).unwrap_or("🥷".into());
 
-            let vello::peniko::Color { r, g, b, a } = vello::peniko::Color::PURPLE;
-            let color = u32::from_ne_bytes([r, g, b, a]);
+            let color = u32::from_ne_bytes([147, 112, 219, 255]);
             let request = tonic::Request::new(DrawTextRequest {
                 x,
                 y,

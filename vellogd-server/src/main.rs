@@ -1,5 +1,7 @@
-// The code related to vello is based on the example code on vello's repo
-// (examples/simple/main.rs).
+// The code related to vello is based on
+//
+// - the example code on linbender/vello (examples/simple/main.rs).
+// - the example code on linbender/parley (examples/vello_editor/src/main.rs).
 
 mod utils;
 
@@ -9,7 +11,7 @@ use utils::u32_to_color;
 use vello::{
     peniko::Color,
     util::{RenderContext, RenderSurface},
-    AaConfig, DebugLayers, Renderer, RendererOptions, Scene,
+    AaConfig, Renderer, RendererOptions, Scene,
 };
 use winit::{
     application::ApplicationHandler,
@@ -20,12 +22,8 @@ use winit::{
 
 use tonic::{transport::Server, Request, Response, Status};
 
-use graphics_device::graphics_device_server::{GraphicsDevice, GraphicsDeviceServer};
-use graphics_device::*;
-
-pub mod graphics_device {
-    tonic::include_proto!("graphics_device");
-}
+use vellogd_protocol::graphics_device_server::{GraphicsDevice, GraphicsDeviceServer};
+use vellogd_protocol::*;
 
 #[derive(Debug)]
 struct VelloGraphicsDevice {
@@ -337,7 +335,6 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                                 width,
                                 height,
                                 antialiasing_method: AaConfig::Msaa16,
-                                debug: DebugLayers::none(),
                             },
                         )
                         .expect("failed to render");
