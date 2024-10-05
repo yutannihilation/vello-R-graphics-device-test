@@ -5,6 +5,7 @@ mod utils;
 
 use std::{num::NonZeroUsize, sync::Arc};
 
+use utils::u32_to_color;
 use vello::{
     peniko::Color,
     util::{RenderContext, RenderSurface},
@@ -189,6 +190,42 @@ impl GraphicsDevice for VelloGraphicsDevice {
         let reply = Empty {};
         Ok(Response::new(reply))
     }
+
+    async fn draw_text(
+        &self,
+        request: Request<DrawTextRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        println!("{:?}", request);
+
+        let DrawTextRequest {
+            x,
+            y,
+            text,
+            color,
+            size,
+            lineheight,
+            face,
+            family,
+            angle,
+            hadj,
+        } = request.into_inner();
+
+        self.event_loop_proxy
+            .send_event(UserEvent::DrawText {
+                pos: vello::kurbo::Point::new(x, y),
+                text,
+                color: u32_to_color(color),
+                size,
+                lineheight,
+                family,
+                angle,
+                hadj,
+            })
+            .map_err(|e| Status::from_error(Box::new(e)))?;
+
+        let reply = Empty {};
+        Ok(Response::new(reply))
+    }
 }
 
 pub struct ActiveRenderState<'a> {
@@ -207,8 +244,8 @@ struct VelloApp<'a> {
     renderers: Vec<Option<Renderer>>,
     state: RenderState<'a>,
     scene: Scene,
-
-    background_color: Color, // TODO
+    background_color: Color,
+    font_ctx: parley::FontContext,
 }
 
 impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
@@ -419,6 +456,100 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                 // TODO: set a flag and redraw lazily
                 render_state.window.request_redraw();
             }
+            UserEvent::DrawText {
+                pos,
+                text,
+                color,
+                size,
+                lineheight,
+                family,
+                angle,
+                hadj,
+            } => {
+                // Note: parley is probably a little bit overkill, but it seems
+                // this is the only interface.
+                let mut layout_ctx: parley::LayoutContext<vello::peniko::Brush> =
+                    parley::LayoutContext::new();
+                let mut layout_builder =
+                    layout_ctx.ranged_builder(&mut self.font_ctx, text.as_str(), 1.0); // TODO: should scale be configurable?
+                layout_builder.push_default(&parley::StyleProperty::FontSize(size));
+                layout_builder.push_default(&parley::StyleProperty::LineHeight(lineheight));
+                layout_builder.push_default(&parley::StyleProperty::FontStack(
+                    parley::FontStack::Source("system-iu"), // TODO: specify family
+                ));
+                // TODO: use build_into() to reuse a Layout?
+                let mut layout = layout_builder.build(text.as_str());
+                layout.break_all_lines(None); // It seems this is mandatory, otherwise no text is drawn. Why?
+                layout.align(None, parley::Alignment::Start);
+
+                let width = layout.width();
+                let transform = vello::kurbo::Affine::translate(((width * hadj) as f64, 0.0))
+                    .then_rotate(angle as f64)
+                    .then_translate((pos.x, pos.y).into());
+
+                for line in layout.lines() {
+                    for item in line.items() {
+                        // ignore inline box
+                        let parley::PositionedLayoutItem::GlyphRun(glyph_run) = item else {
+                            continue;
+                        };
+
+                        let mut x = glyph_run.offset();
+                        let y = glyph_run.baseline();
+                        let run = glyph_run.run();
+
+                        let font = run.font();
+                        let font_size = run.font_size();
+
+                        // TODO:  It seems this is to handle italic. Is this necessary?
+                        //
+                        // https://github.com/linebender/parley/blob/be9e9ab3fc3fe92b3887048d5123c963cffac3d5/examples/vello_editor/src/text.rs#L364-L366
+                        // https://docs.rs/kurbo/latest/kurbo/struct.Affine.html#method.skew
+                        //
+                        // let glyph_xform = run.synthesis().skew().map(|angle| {
+                        //     vello::kurbo::Affine::skew(angle.to_radians().tan() as f64, 0.0)
+                        // });
+
+                        let coords = run
+                            .normalized_coords()
+                            .iter()
+                            .map(|coord| {
+                                vello::skrifa::instance::NormalizedCoord::from_bits(*coord)
+                            })
+                            .collect::<Vec<_>>();
+
+                        // TODO: vello and parley uses different versions of font
+                        let font = {
+                            let raw = font.clone().data.into_raw_parts();
+                            let data = vello::peniko::Blob::from_raw_parts(raw.0, raw.1);
+                            vello::peniko::Font::new(data, font.index)
+                        };
+
+                        self.scene
+                            .draw_glyphs(&font)
+                            .brush(color)
+                            .transform(transform)
+                            .font_size(font_size)
+                            .normalized_coords(&coords)
+                            .draw(
+                                vello::peniko::Fill::NonZero,
+                                glyph_run.glyphs().map(|g| {
+                                    let gx = x + g.x;
+                                    let gy = y - g.y;
+                                    x += g.advance;
+                                    vello::Glyph {
+                                        id: g.id as _,
+                                        x: gx,
+                                        y: gy,
+                                    }
+                                }),
+                            );
+                    }
+                }
+
+                // TODO: set a flag and redraw lazily
+                render_state.window.request_redraw();
+            }
         };
     }
 }
@@ -458,6 +589,18 @@ enum UserEvent {
         fill_params: Option<FillParams>,
         stroke_params: Option<StrokeParams>,
     },
+    DrawText {
+        pos: vello::kurbo::Point,
+        text: String,
+        color: vello::peniko::Color,
+        size: f32,
+        lineheight: f32,
+        // TODO
+        // face
+        family: String,
+        angle: f32,
+        hadj: f32,
+    },
 }
 
 fn create_vello_renderer(render_cx: &RenderContext, surface: &RenderSurface) -> Renderer {
@@ -481,7 +624,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         state: RenderState::Suspended(None),
         scene: Scene::new(),
         background_color: Color::WHITE_SMOKE,
+        font_ctx: parley::FontContext::new(),
     };
+
     let event_loop = EventLoop::<UserEvent>::with_user_event().build()?;
     let event_loop_proxy = event_loop.create_proxy();
 

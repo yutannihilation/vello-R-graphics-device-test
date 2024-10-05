@@ -126,6 +126,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
             client.draw_polygon(request).await
         }
+        "text" => {
+            let x: f64 = std::env::args()
+                .nth(2)
+                .unwrap_or_default()
+                .parse()
+                .unwrap_or(100.0);
+            let y: f64 = std::env::args()
+                .nth(3)
+                .unwrap_or_default()
+                .parse()
+                .unwrap_or(100.0);
+            let text = std::env::args().nth(4).unwrap_or("🥷".into());
+
+            let vello::peniko::Color { r, g, b, a } = vello::peniko::Color::PURPLE;
+            let color = u32::from_ne_bytes([r, g, b, a]);
+            let request = tonic::Request::new(DrawTextRequest {
+                x,
+                y,
+                text,
+                color,
+                size: 100.0,
+                lineheight: 1.2,
+                face: 1,
+                family: "Arial".into(),
+                angle: 30.0_f32.to_radians(),
+                hadj: 0.0,
+            });
+            client.draw_text(request).await
+        }
         _ => client.new_page(Empty {}).await,
     }?;
 
