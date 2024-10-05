@@ -480,11 +480,12 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                 layout.align(None, parley::Alignment::Start);
 
                 let width = layout.width();
-                let transform = vello::kurbo::Affine::translate(((width * hadj) as f64, 0.0))
-                    .then_rotate(angle as f64)
+                let transform = vello::kurbo::Affine::translate((-(width * hadj) as f64, 0.0))
+                    .then_rotate(-angle as f64)
                     .then_translate((pos.x, pos.y).into());
 
                 for line in layout.lines() {
+                    let vadj = line.metrics().ascent * 0.5;
                     for item in line.items() {
                         // ignore inline box
                         let parley::PositionedLayoutItem::GlyphRun(glyph_run) = item else {
@@ -492,7 +493,7 @@ impl<'a> ApplicationHandler<UserEvent> for VelloApp<'a> {
                         };
 
                         let mut x = glyph_run.offset();
-                        let y = glyph_run.baseline();
+                        let y = glyph_run.baseline() - vadj;
                         let run = glyph_run.run();
 
                         let font = run.font();

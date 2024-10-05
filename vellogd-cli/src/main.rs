@@ -112,6 +112,7 @@ enum Commands {
         face: u32,
         #[arg(long, default_value = "Arial")]
         family: String,
+        /// Angle in degree (translated to radian internally)
         #[arg(long, default_value_t = 0.0)]
         angle: f32,
         #[arg(long, default_value_t = 0.0)]
@@ -306,7 +307,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 lineheight,
                 face,
                 family,
-                angle,
+                angle: angle.to_radians(),
                 hadj,
             });
             client.draw_text(request).await
