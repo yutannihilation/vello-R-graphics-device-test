@@ -27,18 +27,18 @@ pub mod graphics_device {
 }
 
 #[derive(Debug)]
-struct MyGraphicsDevice {
+struct VelloGraphicsDevice {
     event_loop_proxy: EventLoopProxy<UserEvent>,
 }
 
-impl MyGraphicsDevice {
+impl VelloGraphicsDevice {
     fn new(event_loop_proxy: EventLoopProxy<UserEvent>) -> Self {
         Self { event_loop_proxy }
     }
 }
 
 #[tonic::async_trait]
-impl GraphicsDevice for MyGraphicsDevice {
+impl GraphicsDevice for VelloGraphicsDevice {
     async fn close_window(&self, request: Request<Empty>) -> Result<Response<Empty>, Status> {
         println!("{:?}", request);
 
@@ -486,7 +486,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let event_loop_proxy = event_loop.create_proxy();
 
     let addr = "[::1]:50051".parse()?;
-    let greeter = MyGraphicsDevice::new(event_loop_proxy);
+    let greeter = VelloGraphicsDevice::new(event_loop_proxy);
 
     tokio::spawn(async move {
         // TODO: propagate error via EventLoopProxy
