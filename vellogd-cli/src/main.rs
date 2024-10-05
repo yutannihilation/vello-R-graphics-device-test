@@ -4,36 +4,85 @@ use vellogd_protocol::*;
 const MEDIUM_PURPLE: u32 = u32::from_ne_bytes([147, 112, 219, 255]);
 const PALE_GREEN: u32 = u32::from_ne_bytes([152, 251, 152, 255]);
 
+use clap::{Parser, Subcommand};
+
+fn hex_color_to_u32<T: AsRef<str>>(x: T) -> u32 {
+    let x = x.as_ref();
+    let x_parsed = u32::from_str_radix(x, 16).unwrap();
+
+    match x.len() {
+        4 => {
+            let a = x_parsed & 0xf;
+            let b = (x_parsed >> 4) & 0xf;
+            let g = (x_parsed >> 8) & 0xf;
+            let r = (x_parsed >> 12) & 0xf;
+            r + (r << 4) + (g << 8) + (g << 12) + (b << 16) + (b << 20) + (a << 24) + (a << 28)
+        }
+        3 => {
+            let b = x_parsed & 0xf;
+            let g = (x_parsed >> 4) & 0xf;
+            let r = (x_parsed >> 8) & 0xf;
+            r + (r << 4) + (g << 8) + (g << 12) + (b << 16) + (b << 20) + 0xff000000_u32
+        }
+        _ => panic!("invalid color format"),
+    }
+}
+
+/// A CLI to debug vellogd-server
+#[derive(Debug, Parser)] // requires `derive` feature
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Debug, Subcommand)]
+enum Commands {
+    #[command()]
+    Close {},
+
+    #[command()]
+    Circle {
+        #[arg()]
+        cx: f64,
+        #[arg()]
+        cy: f64,
+        #[arg(long, short, default_value_t = 50.0)]
+        radius: f64,
+        #[arg(long, short, default_value_t = 8.0)]
+        width: f64,
+        #[arg(long, short, default_value = "999")]
+        fill: String,
+        #[arg(long, short, default_value = "000")]
+        color: String,
+    },
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Cli::parse();
+    println!("{args:?}");
+
     let mut client = GraphicsDeviceClient::connect("http://[::1]:50051").await?;
 
-    let subcommand = std::env::args().nth(1).unwrap_or_default();
-    println!("{subcommand}");
-    let response = match subcommand.as_str() {
-        "close" => {
+    let response = match args.command {
+        Commands::Close {} => {
             let request = tonic::Request::new(Empty {});
             client.close_window(request).await
         }
-        "circle" => {
-            let cx: f64 = std::env::args()
-                .nth(2)
-                .unwrap_or_default()
-                .parse()
-                .unwrap_or(100.0);
-            let cy: f64 = std::env::args()
-                .nth(3)
-                .unwrap_or_default()
-                .parse()
-                .unwrap_or(100.0);
 
-            let fill_color = MEDIUM_PURPLE;
-
-            let stroke_color = PALE_GREEN;
-            let stroke_width = 10.0;
+        Commands::Circle {
+            cx,
+            cy,
+            radius,
+            width,
+            fill,
+            color,
+        } => {
+            let fill_color = hex_color_to_u32(fill);
+            let stroke_color = hex_color_to_u32(color);
             let stroke_params = StrokeParameters {
                 color: stroke_color,
-                width: stroke_width,
+                width,
                 linetype: 1,
                 join: 1,
                 miter_limit: 1.0,
@@ -43,12 +92,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let request = tonic::Request::new(DrawCircleRequest {
                 cx,
                 cy,
-                radius: 100.0,
+                radius,
                 fill_color: Some(fill_color),
                 stroke_params: Some(stroke_params),
             });
             client.draw_circle(request).await
         }
+    }?;
+
+    println!("RESPONSE={:?}", response);
+
+    return Ok(());
+
+    let subcommand = std::env::args().nth(1).unwrap_or_default();
+    println!("{subcommand}");
+    let response_ = match subcommand.as_str() {
         "line" => {
             let x0: f64 = std::env::args()
                 .nth(2)
